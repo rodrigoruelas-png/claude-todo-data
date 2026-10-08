@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendientes</title>
+<meta name="description" content="Lista de tareas simple, rápida y privada. Se guarda en tu navegador.">
+<style>
+  :root {
+    --bg: #f4f1ec;
+    --bg-glow: #e7e2f7;
+    --card: #ffffff;
+    --ink: #1d1b26;
+    --muted: #7a7788;
+    --line: #ebe8f0;
+    --accent: #6c4cf1;
+    --accent-2: #a78bfa;
+    --accent-soft: #efeaff;
+    --danger: #e5484d;
+    --ok: #2fb67c;
+    --shadow: 0 20px 50px -20px rgba(60, 40, 140, .25), 0 2px 6px rgba(30, 20, 60, .05);
+    --radius: 22px;
+  }
+  :root[data-theme="dark"] {
+    --bg: #12111a;
+    --bg-glow: #2a2150;
+    --card: #1b1a26;
+    --ink: #f1effa;
+    --muted: #9a97ad;
+    --line: #2a2938;
+    --accent: #9b82ff;
+    --accent-2: #6c4cf1;
+    --accent-soft: #2a2450;
+    --shadow: 0 20px 50px -20px rgba(0, 0, 0, .6);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    min-height: 100vh;
+    font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 500px at 85% -10%, var(--bg-glow), transparent 60%),
+      radial-gradient(700px 400px at -10% 110%, var(--bg-glow), transparent 60%),
+      var(--bg);
+    display: flex; justify-content: center;
+    padding: 48px 16px 64px;
+    transition: background .3s;
+  }
+  .app { width: 100%; max-width: 560px; }
+
+  header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
+  .date { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: 38px; letter-spacing: -.03em; line-height: 1.1; margin-top: 4px; }
+  h1 span { background: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .icon-btn {
+    width: 42px; height: 42px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); cursor: pointer; font-size: 18px;
+    display: grid; place-items: center; transition: transform .15s, border-color .15s;
+  }
+  .icon-btn:hover { transform: translateY(-1px); border-color: var(--accent); }
+
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--line); }
+
+  .progress { padding: 18px 20px; margin-bottom: 14px; }
+  .progress-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--muted); }
+  .progress-top b { color: var(--ink); font-size: 22px; letter-spacing: -.02em; }
+  .bar { height: 8px; border-radius: 99px; background: var(--accent-soft); margin-top: 12px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .5s cubic-bezier(.3,.9,.3,1); }
+
+  form.add { display: flex; gap: 10px; padding: 10px; margin-bottom: 14px; }
+  form.add input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink);
+    font: inherit; font-size: 16px; padding: 10px 12px;
+  }
+  form.add input::placeholder { color: var(--muted); }
+  .primary {
+    border: 0; cursor: pointer; color: #fff; font: inherit; font-weight: 600;
+    padding: 0 20px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 8px 18px -8px var(--accent); transition: transform .15s, filter .15s;
+  }
+  .primary:hover { transform: translateY(-1px); filter: brightness(1.06); }
+  .primary:active { transform: scale(.97); }
+
+  .tabs { display: flex; gap: 6px; padding: 5px; margin-bottom: 14px; background: var(--accent-soft); border-radius: 16px; }
+  .tabs button {
+    flex: 1; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600;
+    padding: 9px 4px; border-radius: 12px; cursor: pointer; transition: all .2s;
+  }
+  .tabs button.on { background: var(--card); color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+  ul { list-style: none; padding: 0; display: grid; gap: 10px; }
+  li {
+    display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    animation: in .3s cubic-bezier(.3,.9,.3,1);
+    transition: border-color .2s, opacity .2s;
+  }
+  li:hover { border-color: var(--accent-2); }
+  @keyframes in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+  .check {
+    appearance: none; -webkit-appearance: none; flex: none; width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid var(--line); cursor: pointer; display: grid; place-items: center; background: transparent;
+    transition: all .2s; box-shadow: inset 0 0 0 0 var(--ok);
+  }
+  .check:hover { border-color: var(--accent); }
+  .check:checked { border-color: var(--ok); background: var(--ok); }
+  .check:checked::after { content: ""; width: 6px; height: 11px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+  .check:focus-visible, .icon-btn:focus-visible, .tabs button:focus-visible, .primary:focus-visible, .row-btn:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+  .text { flex: 1; min-width: 0; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; cursor: text; }
+  li.done .text { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--accent-2); }
+  .edit { flex: 1; font: inherit; font-size: 16px; color: var(--ink); background: var(--accent-soft); border: 0; outline: 2px solid var(--accent); border-radius: 10px; padding: 6px 10px; }
+  .row-btn {
+    border: 0; background: transparent; color: var(--muted); cursor: pointer; width: 32px; height: 32px;
+    border-radius: 10px; font-size: 16px; opacity: 0; transition: all .15s;
+  }
+  li:hover .row-btn, li:focus-within .row-btn { opacity: 1; }
+  .row-btn:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  @media (hover: none) { .row-btn { opacity: 1; } }
+
+  .empty { text-align: center; padding: 44px 20px; color: var(--muted); }
+  .empty .big { font-size: 44px; margin-bottom: 8px; }
+  .empty b { display: block; color: var(--ink); font-size: 17px; margin-bottom: 4px; }
+
+  footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; color: var(--muted); font-size: 14px; padding: 0 4px; }
+  footer button { border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+  footer button:hover { color: var(--danger); }
+  footer button[disabled] { opacity: .4; pointer-events: none; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <div>
+      <div class="date" id="date"></div>
+      <h1>Mis <span>pendientes</span></h1>
+    </div>
+    <button class="icon-btn" id="theme" aria-label="Cambiar tema">🌙</button>
+  </header>
+
+  <section class="card progress" aria-live="polite">
+    <div class="progress-top"><span id="msg">Todo al día</span><b id="pct">0%</b></div>
+    <div class="bar"><i id="bar"></i></div>
+  </section>
+
+  <form class="card add" id="form">
+    <input id="input" placeholder="¿Qué necesitas hacer?" autocomplete="off" maxlength="200" aria-label="Nueva tarea">
+    <button class="primary" type="submit">Agregar</button>
+  </form>
+
+  <nav class="tabs" id="tabs" aria-label="Filtros">
+    <button data-f="all" class="on">Todas</button>
+    <button data-f="active">Pendientes</button>
+    <button data-f="done">Hechas</button>
+  </nav>
+
+  <ul id="list"></ul>
+
+  <footer>
+    <span id="left"></span>
+    <button id="clear">Borrar completadas</button>
+  </footer>
+</main>
+
+<script>
+(() => {
+  const KEY = "pendientes.v1";
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+
+  let tasks = store.get(KEY, []);
+  let filter = "all";
+  let editing = null;
+
+  // Tema
+  const root = document.documentElement;
+  const prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const setTheme = (t) => { root.dataset.theme = t; $("theme").textContent = t === "dark" ? "☀️" : "🌙"; store.set("pendientes.theme", t); };
+  setTheme(store.get("pendientes.theme", prefersDark ? "dark" : "light"));
+  $("theme").onclick = () => setTheme(root.dataset.theme === "dark" ? "light" : "dark");
+
+  $("date").textContent = new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+
+  const save = () => { store.set(KEY, tasks); render(); };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  $("form").onsubmit = (e) => {
+    e.preventDefault();
+    const text = $("input").value.trim();
+    if (!text) return;
+    tasks.unshift({ id: uid(), text, done: false });
+    $("input").value = "";
+    save();
+  };
+
+  $("tabs").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    filter = b.dataset.f;
+    document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+    render();
+  };
+
+  $("clear").onclick = () => { tasks = tasks.filter((t) => !t.done); save(); };
+
+  function render() {
+    const list = $("list");
+    list.textContent = "";
+    const shown = tasks.filter((t) => filter === "all" || (filter === "done") === t.done);
+
+    if (!shown.length) {
+      const empty = document.createElement("div");
+      empty.className = "card empty";
+      const msgs = {
+        all: ["✨", "Nada por aquí", "Agrega tu primera tarea arriba."],
+        active: ["🎉", "¡Todo listo!", "No tienes pendientes."],
+        done: ["🌱", "Aún no hay completadas", "Termina una tarea para verla aquí."]
+      }[filter];
+      empty.innerHTML = `<div class="big">${msgs[0]}</div><b>${msgs[1]}</b>${msgs[2]}`;
+      list.append(empty);
+    }
+
+    for (const t of shown) {
+      const li = document.createElement("li");
+      li.className = t.done ? "done" : "";
+
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.className = "check"; cb.checked = t.done;
+      cb.setAttribute("aria-label", "Completar: " + t.text);
+      cb.onchange = () => { t.done = cb.checked; save(); };
+
+      let body;
+      if (editing === t.id) {
+        body = document.createElement("input");
+        body.className = "edit"; body.value = t.text; body.maxLength = 200;
+        const commit = () => { const v = body.value.trim(); if (v) t.text = v; editing = null; save(); };
+        body.onkeydown = (e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { editing = null; render(); } };
+        body.onblur = commit;
+        queueMicrotask(() => { body.focus(); body.select(); });
+      } else {
+        body = document.createElement("span");
+        body.className = "text"; body.textContent = t.text; body.title = "Doble clic para editar";
+        body.ondblclick = () => { editing = t.id; render(); };
+      }
+
+      const del = document.createElement("button");
+      del.className = "row-btn"; del.textContent = "✕"; del.setAttribute("aria-label", "Eliminar: " + t.text);
+      del.onclick = () => { tasks = tasks.filter((x) => x.id !== t.id); save(); };
+
+      li.append(cb, body, del);
+      list.append(li);
+    }
+
+    const total = tasks.length, done = tasks.filter((t) => t.done).length, left = total - done;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    $("pct").textContent = pct + "%";
+    $("bar").style.width = pct + "%";
+    $("msg").textContent = !total ? "Empieza agregando una tarea" : left ? `${done} de ${total} completadas` : "¡Todo al día! 🎉";
+    $("left").textContent = left === 1 ? "1 pendiente" : left + " pendientes";
+    $("clear").disabled = !done;
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
