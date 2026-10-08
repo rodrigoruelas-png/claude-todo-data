@@ -1,0 +1,23 @@
+[
+  {
+    "id": "task-001",
+    "titulo": "Definir el formato de tareas",
+    "estado": "hecho",
+    "creada": "2026-10-08T09:00:00Z",
+    "actualizada": "2026-10-08T10:00:00Z"
+  },
+  {
+    "id": "task-002",
+    "titulo": "Crear un validador de tareas",
+    "estado": "backlog",
+    "creada": "2026-10-08T09:15:00Z",
+    "actualizada": "2026-10-08T09:15:00Z"
+  },
+  {
+    "id": "task-003",
+    "titulo": "Preparar la guía de uso",
+    "estado": "en-progreso",
+    "creada": "2026-10-08T09:30:00Z",
+    "actualizada": "2026-10-08T09:45:00Z"
+  }
+]
