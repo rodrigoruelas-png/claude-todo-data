@@ -55,10 +55,8 @@ Ensure-Field "ENTRENAMIENTOS" "FechaFin"      DateTime
 Ensure-Field "ENTRENAMIENTOS" "Resultado"     Choice @("En proceso","Aprobado","Reprobado")
 Ensure-Field "ENTRENAMIENTOS" "Intentos"      Number
 Ensure-Field "ENTRENAMIENTOS" "Entrenador"    Text
-Ensure-Field "ENTRENAMIENTOS" "FirmaSupervisor" Text
-Ensure-Field "ENTRENAMIENTOS" "FechaFirmaSup"   DateTime
-Ensure-Field "ENTRENAMIENTOS" "FirmaIngenieria" Text
-Ensure-Field "ENTRENAMIENTOS" "FechaFirmaIng"   DateTime
+Ensure-Field "ENTRENAMIENTOS" "AprobadoPor"     Text      # Gaddiel (único aprobador)
+Ensure-Field "ENTRENAMIENTOS" "FechaAprobacion" DateTime
 Ensure-Field "ENTRENAMIENTOS" "Comentarios"   Note
 
 # --- EFECTIVIDAD (resultados medibles por empleado y periodo) ---
@@ -77,10 +75,10 @@ Ensure-Field "POSICIONES" "Linea"               Choice @("HP","NPT1","NPT2","TB"
 Ensure-Field "POSICIONES" "NivelRequerido"      Choice @("A","B","C","Tecnico")
 Ensure-Field "POSICIONES" "NumEmpleadoAsignado" Text
 
-# --- FIRMANTES (quién autoriza) ---
+# --- FIRMANTES (quién aprueba; inicialmente solo Gaddiel) ---
 Ensure-List "FIRMANTES"
 Ensure-Field "FIRMANTES" "Correo" Text
-Ensure-Field "FIRMANTES" "Rol"    Choice @("Supervisor","Ingenieria","Gerencia")
+Ensure-Field "FIRMANTES" "Rol"    Choice @("Supervisor","Gerencia")
 Ensure-Field "FIRMANTES" "Activo" Boolean
 
 # --- Carga de empleados desde CSV (opcional; el CSV queda en tu PC, no en git) ---
