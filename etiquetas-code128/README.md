@@ -1,6 +1,6 @@
 # Etiqueta ORDEN OPERADOR con Code 128 (Excel)
 
-`Etiqueta_Orden_Operador_Code128.xlsm` imprime la etiqueta 4 x 6 in de la
+`Etiqueta_Orden_Operador_Code128_v2_vertical.xlsm` imprime la etiqueta 4 x 6 in de la
 **ESTAMPA ÚNICA / ORDEN OPERADOR** con código de barras en:
 
 | Campo         | Código de barras | Texto legible |
@@ -27,6 +27,15 @@ el driver de la Zebra no tiene que girar ni encoger nada.
 En la Zebra deja la orientación en **Vertical** (no Horizontal). Si alguna vez
 sale de cabeza (180°), cámbialo en *Preferencias de impresión > Opciones >
 Orientación* a **Vertical 180°**; no hace falta tocar el Excel.
+
+### Si sale chica y derecha arriba de la etiqueta
+
+Eso es la versión anterior (horizontal). Revisa que abriste
+**`..._v2_vertical.xlsm`**: la barra azul de arriba dice **v2 (vertical)** y la
+etiqueta de la izquierda tiene los textos de lado. En **Vista previa** la
+etiqueta debe verse de pie, llenando la hoja. Si la vista previa se ve bien y
+aun así sale chica, revisa en la Zebra el tamaño 4.00 x 6.00 in y la
+orientación Vertical.
 
 ## Instalación (una vez por PC)
 
@@ -89,7 +98,7 @@ celda del libro:
 
 | Ruta | Qué es |
 |------|--------|
-| `Etiqueta_Orden_Operador_Code128.xlsm` | El libro listo para usar |
+| `Etiqueta_Orden_Operador_Code128_v2_vertical.xlsm` | El libro listo para usar |
 | `vba/ModCode128.bas` | Codificador Code 128 Auto + verificador mod 103 |
 | `vba/ModImpresion.bas` | Botones: imprimir, lista, limpiar, fuente, impresora |
 | `vba/ThisWorkbook.cls` | Recalcula los códigos al abrir |

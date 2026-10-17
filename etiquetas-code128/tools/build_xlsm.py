@@ -1,4 +1,4 @@
-"""Construye Etiqueta_Orden_Operador_Code128.xlsm.
+"""Construye Etiqueta_Orden_Operador_Code128_v2_vertical.xlsm.
 
     python3 tools/build_xlsm.py [salida.xlsm]
 
@@ -20,7 +20,7 @@ sys.path.insert(0, HERE)
 import code128  # noqa: E402
 import vba_project  # noqa: E402
 
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "Etiqueta_Orden_Operador_Code128.xlsm")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "Etiqueta_Orden_Operador_Code128_v2_vertical.xlsm")
 
 BARCODE_FONT = "Libre Barcode 128"
 BARCODE_SIZE = 35.5          # 0.03 em por modulo -> 3 puntos por modulo a 203 dpi
@@ -314,7 +314,7 @@ def build():
     def prow(i):
         return LROW0 + i
 
-    cv.put(0, 0, 0, P + 3, "  ORDEN OPERADOR  ·  Etiqueta 4 x 6 con Code 128",
+    cv.put(0, 0, 0, P + 3, "  ORDEN OPERADOR  ·  Etiqueta 4 x 6 con Code 128  ·  v2 (vertical)",
            font_name="Calibri", font_size=13, bold=True, font_color="#FFFFFF",
            bg_color="#1F3864", valign="vcenter")
     for j, h in enumerate(["CAMPO", "DATO (escribe o escanea)", "PRUEBA: escanea aquí",
