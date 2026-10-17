@@ -1,6 +1,6 @@
 # Etiqueta ORDEN OPERADOR con Code 128 (Excel)
 
-`Etiqueta_Orden_Operador_Code128.xlsm` imprime la etiqueta 6 x 4 in de la
+`Etiqueta_Orden_Operador_Code128.xlsm` imprime la etiqueta 4 x 6 in de la
 **ESTAMPA ÚNICA / ORDEN OPERADOR** con código de barras en:
 
 | Campo         | Código de barras | Texto legible |
@@ -18,16 +18,15 @@ Simbología: **Code 128 Auto** (usa los subconjuntos B y C según el dato) con
 
 ## Cómo sale en el rollo 4 x 6
 
-La hoja se diseña horizontal (6 x 4) y se imprime en **horizontal** sobre la
-etiqueta 4 x 6 de la Zebra. El driver la gira 90° y queda en la misma posición
-que la plantilla de Label Matrix: QTY TOTAL arriba a la izquierda, W.O./JOB
-abajo, TEST DATA abajo a la derecha.
+La etiqueta ya viene **girada dentro del Excel**, en la misma posición que la
+plantilla ORDEN OPERADOR de Label Matrix: QTY TOTAL arriba a la izquierda,
+OB al centro, W.O./JOB abajo, TEST DATA abajo a la derecha. Se imprime en
+**vertical** a tamaño completo (3.9 x 5.9 in sobre la etiqueta de 4 x 6), así
+el driver de la Zebra no tiene que girar ni encoger nada.
 
-![Rollo 4x6](vista_previa_rollo_4x6.png)
-
-Si en tu impresora sale girada al revés (180°), cámbialo en
-*Preferencias de impresión de la Zebra > Opciones > Orientación* a
-**Horizontal 180°**. No hace falta cambiar nada en el Excel.
+En la Zebra deja la orientación en **Vertical** (no Horizontal). Si alguna vez
+sale de cabeza (180°), cámbialo en *Preferencias de impresión > Opciones >
+Orientación* a **Vertical 180°**; no hace falta tocar el Excel.
 
 ## Instalación (una vez por PC)
 
@@ -46,16 +45,16 @@ Si en tu impresora sale girada al revés (180°), cámbialo en
    derecho > *Propiedades* > marca **Desbloquear** > *Aceptar*, ábrelo y
    presiona **Habilitar contenido**.
 3. **Impresora Zebra ZT230 (203 dpi)**: en *Preferencias de impresión* pon el
-   tamaño de etiqueta **4.00 x 6.00 in**. La hoja ETIQUETA ya está en
-   horizontal, con márgenes 0 y ajustada a 1 página. El botón
+   tamaño de etiqueta **4.00 x 6.00 in** y orientación **Vertical**. La hoja
+   ETIQUETA ya está en vertical, con márgenes 0 y ajustada a 1 página. El botón
    **Elegir impresora** abre el diálogo de Windows.
 
 ## Uso diario (hoja ETIQUETA)
 
 1. Escribe o escanea **W.O. / JOB, OB, QTY TOTAL y P/N**. HEAT CODE y HEAT LOT
    son opcionales (si se dejan vacíos queda la línea para escribir a mano).
-2. Revisa la vista previa debajo de la captura (es exactamente lo que se
-   imprime).
+2. Revisa la etiqueta de la izquierda: es exactamente lo que se imprime, en
+   la misma posición que Label Matrix.
 3. Pon las **COPIAS** y presiona **IMPRIMIR**.
 4. Escanea la etiqueta impresa en la columna **PRUEBA**: el ESTADO debe decir
    **OK**. Esto confirma el código y su dígito verificador.
@@ -116,9 +115,9 @@ copia el cambio al `.bas` correspondiente para no perderlo al regenerar.
   resultado que `tools/code128.py` en 23 casos (numéricos, alfanuméricos,
   corridas pares e impares, símbolos, espacios, Ñ/acentos rechazados y mapeo
   GRANDZEBU). El ESTADO y el botón Limpiar funcionaron.
-- La etiqueta se dibujó a 203 dpi con Libre Barcode 128 y los 4 códigos
-  (JOB, OB, QTY, P/N) se leyeron con un decodificador (zxing) con verificador
-  válido. Todas las barras miden 3, 6, 9 o 12 puntos exactos.
+- La etiqueta girada se dibujó a 203 dpi con Libre Barcode 128 y los 4
+  códigos (JOB, OB, QTY, P/N) se leyeron con un decodificador (zxing) con
+  verificador válido. Todas las barras miden 3, 6, 9 o 12 puntos exactos.
 - 32 textos que cubren los 105 valores de Code 128 que usa el codificador se
   dibujaron y decodificaron correctamente.
 - Falta probarlo en Excel con la Zebra real: imprime una etiqueta y escanéala

@@ -3,7 +3,7 @@
     python3 tools/build_xlsm.py [salida.xlsm]
 
 Hojas:
-  ETIQUETA  captura de datos + etiqueta 6 x 4 in (lo que se imprime)
+  ETIQUETA  captura de datos + etiqueta 4 x 6 in girada como Label Matrix (lo que se imprime)
   LISTA     varias ordenes para imprimir en ciclo
   CONFIG    fuente de codigo de barras, prueba e instrucciones
 """
@@ -28,11 +28,15 @@ MAPEO_DEFAULT = "LIBRE / IDAUTOMATION"
 MAPEOS = [MAPEO_DEFAULT, "GRANDZEBU (Code 128)"]
 TEXT_FONT = "Arial"
 
-# Etiqueta: 47 columnas de 12 px (0.125 in) = 5.875 in de ancho.
+# La etiqueta se diseña "acostada" (6 x 4 in): 47 columnas de 0.125 in y las filas
+# de LABEL_ROWS. Luego se gira 90 grados (texto de abajo hacia arriba) y se pone en
+# la hoja de pie (4 x 6 in), igual que la plantilla ORDEN OPERADOR de Label Matrix.
+# Asi se imprime vertical y el driver de la Zebra no tiene que girar nada.
 LABEL_COLS = 47
-COL0 = 1                     # la etiqueta empieza en la columna B
-ROW0 = 12                    # y en la fila 13 (indice 12)
-LABEL_ROWS = [               # alto de cada fila de la etiqueta, en puntos
+LROW0 = 1                    # la etiqueta girada empieza en la fila 2
+LCOL0 = 1                    # y en la columna B
+ROW_PT = 9                   # cada columna de diseño = una fila de 9 pt (0.125 in)
+LABEL_ROWS = [               # alto de cada fila de diseño (= ancho de columna), en pt
     10, 23, 11, 4,           # 0-3   JOB / OB / QTY
     10, 23, 11, 3,           # 4-7   P/N
     10, 13, 3,               # 8-10  HEAT CODE / HEAT LOT
@@ -118,14 +122,53 @@ class Canvas:
                 self.ws.write_blank(r, c, None, self.fmt(r, c))
 
 
+# Giro de 90 grados contra reloj: lo de arriba queda a la izquierda, lo de la
+# izquierda queda abajo. (fila k, columna c) del diseño -> (fila, columna) de la hoja.
+TURN_SIDE = {"top": "left", "bottom": "right", "left": "bottom", "right": "top"}
+TURN_ALIGN = {"left": "bottom", "center": "vcenter", "right": "top"}
+TURN_VALIGN = {"top": "left", "vcenter": "center", "bottom": "right"}
+
+
+def turn_cell(k, c):
+    return LROW0 + LABEL_COLS - c, LCOL0 + k
+
+
+def turn_props(p):
+    q = {}
+    for key, val in p.items():
+        if key in TURN_SIDE:
+            q[TURN_SIDE[key]] = val
+        elif key not in ("align", "valign"):
+            q[key] = val
+    q["valign"] = TURN_ALIGN[p.get("align", "left")]
+    q["align"] = TURN_VALIGN[p.get("valign", "bottom")]
+    q["rotation"] = 90
+    return q
+
+
+def turn_into(src, dst):
+    """Copia el diseño acostado (src) girado a la hoja (dst). Regresa los nombres."""
+    top_left = {}
+    for (k, c), p in src.props.items():
+        dst.props[turn_cell(k, c)] = turn_props(p)
+    for k1, c1, k2, c2 in src.merges:
+        r1, s1 = turn_cell(k1, c2)
+        r2, s2 = turn_cell(k2, c1)
+        dst.merges.append((r1, s1, r2, s2))
+        top_left[(k1, c1)] = (r1, s1)
+    for (k, c), cell in src.cells.items():
+        dst.cells[top_left.get((k, c), turn_cell(k, c))] = cell
+    return {name: top_left.get(kc, turn_cell(*kc)) for name, kc in src.names.items()}
+
+
 def label_layout(cv):
-    """Diseño de ESTAMPA UNICA 6x4 / ORDEN OPERADOR."""
+    """Diseño de ESTAMPA UNICA / ORDEN OPERADOR, acostado (6 x 4)."""
 
     def R(k):
-        return ROW0 + k
+        return k
 
     def C(c):
-        return COL0 + c - 1
+        return c
 
     def put(k1, c1, k2, c2, value, **kw):
         kw.setdefault("font_name", TEXT_FONT)
@@ -229,7 +272,7 @@ def build():
     wb = xlsxwriter.Workbook(OUT)
     wb.set_vba_name("ThisWorkbook")
     wb.set_properties({"title": "Etiqueta Orden Operador - Code 128",
-                       "subject": "Impresion de etiquetas 6x4 con codigo de barras Code 128"})
+                       "subject": "Impresion de etiquetas 4x6 con codigo de barras Code 128"})
 
     et = wb.add_worksheet("ETIQUETA")
     li = wb.add_worksheet("LISTA")
@@ -251,117 +294,120 @@ def build():
     names = {}
 
     # ===================== ETIQUETA ======================================
+    # Etiqueta girada a la izquierda (columnas B..AB), panel de captura a la derecha.
     et.hide_gridlines(2)
     et.set_column_pixels(0, 0, 16)
-    et.set_column_pixels(COL0, COL0 + LABEL_COLS - 1, 12)
-    et.set_column_pixels(COL0 + LABEL_COLS, COL0 + LABEL_COLS, 20)
-    et.set_column_pixels(COL0 + LABEL_COLS + 1, COL0 + LABEL_COLS + 9, 64)
-    for r, h in enumerate([26, 16, 20, 20, 20, 20, 20, 20, 20, 6, 15, 5]):
-        et.set_row(r, h)
     for k, h in enumerate(LABEL_ROWS):
-        et.set_row(ROW0 + k, h)
+        et.set_column_pixels(LCOL0 + k, LCOL0 + k, round(h * 4 / 3))
+    gap = LCOL0 + len(LABEL_ROWS)
+    et.set_column_pixels(gap, gap, 24)
+    P = gap + 1                       # columnas del panel: CAMPO, DATO, PRUEBA, ESTADO
+    for j, w in enumerate([112, 190, 150, 130]):
+        et.set_column_pixels(P + j, P + j, w)
+    et.set_row(0, 26)
+    for i in range(LABEL_COLS):
+        et.set_row(LROW0 + i, ROW_PT)
 
     cv = Canvas(wb, et)
-    cv.names = names
     pf = dict(font_name="Calibri", font_size=10, valign="vcenter")
 
-    def C(c):
-        return COL0 + c - 1
+    def prow(i):
+        return LROW0 + i
 
-    cv.put(0, C(1), 0, C(LABEL_COLS), "  ORDEN OPERADOR  ·  Etiqueta 6 x 4 con Code 128",
+    cv.put(0, 0, 0, P + 3, "  ORDEN OPERADOR  ·  Etiqueta 4 x 6 con Code 128",
            font_name="Calibri", font_size=13, bold=True, font_color="#FFFFFF",
            bg_color="#1F3864", valign="vcenter")
-    cols = [(1, 9), (10, 24), (25, 36), (37, 47)]
-    for (c1, c2), h in zip(cols, ["CAMPO", "DATO (escribe o escanea)",
-                                  "PRUEBA: escanea aquí", "ESTADO"]):
-        cv.put(1, C(c1), 1, C(c2), h, bold=True, bg_color="#D9D9D9", align="center",
-               border=THIN, **pf)
+    for j, h in enumerate(["CAMPO", "DATO (escribe o escanea)", "PRUEBA: escanea aquí",
+                           "ESTADO"]):
+        cv.put(prow(0), P + j, prow(1), P + j, h, bold=True, bg_color="#D9D9D9",
+               align="center", border=THIN, **pf)
 
     fields = [
-        ("W.O. / JOB", "In_JOB", "Scan_JOB", "BC_JOB"),
-        ("OB", "In_OB", "Scan_OB", "BC_OB"),
-        ("QTY TOTAL", "In_QTY", "Scan_QTY", "BC_QTY"),
-        ("P/N (MODELO)", "In_PN", "Scan_PN", "BC_PN"),
-        ("HEAT CODE", "In_HEATCODE", None, None),
-        ("HEAT LOT", "In_HEATLOT", None, None),
-        ("COPIAS", "In_COPIAS", None, None),
+        ("W.O. / JOB", "In_JOB", "Scan_JOB", "BC_JOB", "St_JOB"),
+        ("OB", "In_OB", "Scan_OB", "BC_OB", "St_OB"),
+        ("QTY TOTAL", "In_QTY", "Scan_QTY", "BC_QTY", "St_QTY"),
+        ("P/N (MODELO)", "In_PN", "Scan_PN", "BC_PN", "St_PN"),
+        ("HEAT CODE", "In_HEATCODE", None, None, None),
+        ("HEAT LOT", "In_HEATLOT", None, None, None),
+        ("COPIAS", "In_COPIAS", None, None, None),
     ]
     inp = dict(bg_color="#FFF2CC", border=THIN, locked=False, num_format="@", bold=True,
                font_name="Calibri", font_size=12, valign="vcenter")
     scan = dict(bg_color="#DDEBF7", border=THIN, locked=False, num_format="@",
                 font_name="Calibri", font_size=11, valign="vcenter")
-    for j, (title, name, scan_name, bc_name) in enumerate(fields):
-        r = 2 + j
-        cv.put(r, C(1), r, C(9), " " + title, bold=True, border=THIN, **pf)
+    for j, (title, name, scan_name, bc_name, st_name) in enumerate(fields):
+        r1, r2 = prow(2 + 3 * j), prow(4 + 3 * j)
+        cv.put(r1, P, r2, P, " " + title, bold=True, border=THIN, **pf)
         if name == "In_COPIAS":
-            cv.put(r, C(10), r, C(24), 1, **dict(inp, num_format="0", align="left"))
+            cv.put(r1, P + 1, r2, P + 1, 1, **dict(inp, num_format="0", align="left"))
         else:
-            cv.put(r, C(10), r, C(24), None, **inp)
-        names[name] = (r, C(10))
+            cv.put(r1, P + 1, r2, P + 1, None, **inp)
+        names[name] = (r1, P + 1)
         if scan_name:
-            cv.put(r, C(25), r, C(36), None, **scan)
-            names[scan_name] = (r, C(25))
+            cv.put(r1, P + 2, r2, P + 2, None, **scan)
+            names[scan_name] = (r1, P + 2)
             f = ('=IF(TRIM({i})="","",IF(ISERROR(CODE128("0")),"HABILITA MACROS",'
                  'IF({b}="","CARÁCTER NO VÁLIDO",IF(TRIM({s})="","listo",'
                  'IF(UPPER(TRIM({s}))=UPPER(TRIM({i})),"OK","NO COINCIDE")))))'
                  ).format(i=name, s=scan_name, b=bc_name)
-            cv.put(r, C(37), r, C(47), f, formula=True, cached="", bold=True, align="center",
-                   border=THIN, **dict(pf, font_size=9))
+            cv.put(r1, P + 3, r2, P + 3, f, formula=True, cached="", bold=True,
+                   align="center", border=THIN, **dict(pf, font_size=9))
+            names[st_name] = (r1, P + 3)
         else:
-            note = {"In_HEATCODE": "opcional: si se deja vacío queda la línea",
-                    "In_HEATLOT": "opcional: si se deja vacío queda la línea",
+            note = {"In_HEATCODE": "opcional: vacío = línea para escribir",
+                    "In_HEATLOT": "opcional: vacío = línea para escribir",
                     "In_COPIAS": "copias de cada etiqueta (1 a 500)"}[name]
-            cv.put(r, C(25), r, C(47), " " + note, italic=True, font_color="#7F7F7F",
+            cv.put(r1, P + 2, r2, P + 3, " " + note, italic=True, font_color="#7F7F7F",
                    border=THIN, **pf)
-    cv.put(10, C(1), 10, C(LABEL_COLS),
-           "VISTA PREVIA — esto es lo que se imprime (6 x 4 in, horizontal)",
-           italic=True, font_color="#7F7F7F", font_name="Calibri", font_size=9,
-           valign="vcenter")
 
-    label_layout(cv)
+    design = Canvas(None, None)
+    design.names = {}
+    label_layout(design)
+    names.update(turn_into(design, cv))
     cv.flush()
 
     green = wb.add_format({"bg_color": "#C6EFCE", "font_color": "#006100"})
     red = wb.add_format({"bg_color": "#FFC7CE", "font_color": "#9C0006"})
-    status_rng = "%s:%s" % (xlsxwriter.utility.xl_rowcol_to_cell(2, C(37)),
-                            xlsxwriter.utility.xl_rowcol_to_cell(5, C(47)))
+    status_rng = "%s:%s" % (xlsxwriter.utility.xl_rowcol_to_cell(prow(2), P + 3),
+                            xlsxwriter.utility.xl_rowcol_to_cell(prow(13), P + 3))
     et.conditional_format(status_rng, {"type": "text", "criteria": "begins with",
                                        "value": "OK", "format": green})
     for word in ("NO ", "CAR", "HAB"):
         et.conditional_format(status_rng, {"type": "text", "criteria": "begins with",
                                            "value": word, "format": red})
-    et.data_validation(2 + 6, C(10), 2 + 6, C(24), {
+    r, c = names["In_COPIAS"]
+    et.data_validation(r, c, r, c, {
         "validate": "integer", "criteria": "between", "minimum": 1, "maximum": 500,
         "error_title": "Copias", "error_message": "Escribe un número de 1 a 500."})
 
-    bx = COL0 + LABEL_COLS + 1
-    et.insert_button(2, bx, {"macro": "Imprimir_Etiqueta", "caption": "IMPRIMIR",
-                             "width": 170, "height": 56, "x_offset": 4, "y_offset": 2})
-    et.insert_button(5, bx, {"macro": "Vista_Previa", "caption": "Vista previa",
-                             "width": 170, "height": 24, "x_offset": 4, "y_offset": 2})
-    et.insert_button(6, bx, {"macro": "Limpiar_Etiqueta", "caption": "Limpiar",
-                             "width": 170, "height": 24, "x_offset": 4, "y_offset": 4})
-    et.insert_button(8, bx, {"macro": "Elegir_Impresora", "caption": "Elegir impresora",
-                             "width": 170, "height": 24, "x_offset": 4, "y_offset": 0})
+    et.insert_button(prow(24), P + 1, {"macro": "Imprimir_Etiqueta", "caption": "IMPRIMIR",
+                                       "width": 182, "height": 52, "x_offset": 4})
+    et.insert_button(prow(24), P + 2, {"macro": "Vista_Previa", "caption": "Vista previa",
+                                       "width": 142, "height": 24, "x_offset": 4})
+    et.insert_button(prow(26), P + 2, {"macro": "Limpiar_Etiqueta", "caption": "Limpiar",
+                                       "width": 142, "height": 24, "x_offset": 4,
+                                       "y_offset": 4})
+    et.insert_button(prow(24), P + 3, {"macro": "Elegir_Impresora",
+                                       "caption": "Elegir impresora",
+                                       "width": 122, "height": 24, "x_offset": 4})
     help_fmt = wb.add_format({"font_name": "Calibri", "font_size": 10, "text_wrap": True,
                               "valign": "top", "font_color": "#404040"})
-    et.merge_range(ROW0, bx, ROW0 + 16, bx + 4,
+    et.merge_range(prow(31), P, prow(46), P + 3,
                    "PASOS\n"
                    "1. Captura o escanea W.O./JOB, OB, QTY TOTAL y P/N.\n"
-                   "2. Revisa la vista previa.\n"
-                   "3. Pon las COPIAS y presiona IMPRIMIR.\n"
-                   "4. Escanea la etiqueta impresa en la columna PRUEBA: "
-                   "debe decir OK.\n\n"
+                   "2. Revisa la etiqueta de la izquierda: así sale impresa, en la misma "
+                   "posición que Label Matrix.\n"
+                   "3. Pon las COPIAS y presiona IMPRIMIR (se imprime vertical, 4 x 6 in).\n"
+                   "4. Escanea la etiqueta impresa en la columna PRUEBA: debe decir OK.\n\n"
                    "Código: Code 128 Auto, dígito verificador mod 103.\n"
-                   "Impresora: Zebra ZT230, etiqueta 4 x 6 in.\n"
-                   "Varias órdenes: hoja LISTA.  Fuente: hoja CONFIG.",
+                   "Varias órdenes: hoja LISTA.   Fuente: hoja CONFIG.",
                    help_fmt)
 
-    first = xlsxwriter.utility.xl_rowcol_to_cell(ROW0, COL0, row_abs=True, col_abs=True)
-    last = xlsxwriter.utility.xl_rowcol_to_cell(ROW0 + len(LABEL_ROWS) - 1,
-                                                COL0 + LABEL_COLS - 1, row_abs=True, col_abs=True)
-    et.print_area("%s:%s" % (first.replace("$", ""), last.replace("$", "")))
-    et.set_landscape()
+    first = xlsxwriter.utility.xl_rowcol_to_cell(LROW0, LCOL0)
+    last = xlsxwriter.utility.xl_rowcol_to_cell(LROW0 + LABEL_COLS - 1,
+                                                LCOL0 + len(LABEL_ROWS) - 1)
+    et.print_area("%s:%s" % (first, last))
+    et.set_portrait()
     et.set_margins(left=0, right=0, top=0, bottom=0)
     et.set_header("", {"margin": 0})
     et.set_footer("", {"margin": 0})
@@ -498,8 +544,9 @@ def build():
         "\"Libre Barcode 128\" (mapeo LIBRE / IDAUTOMATION). Si tu fuente es la "
         "\"Code 128\" de grandzebu, elige el mapeo GRANDZEBU.",
         "3. Impresora Zebra ZT230 (203 dpi): en Preferencias de impresión pon el tamaño "
-        "de etiqueta 4.00 x 6.00 in. La hoja ETIQUETA ya está en horizontal, márgenes 0, "
-        "ajustada a 1 página.",
+        "de etiqueta 4.00 x 6.00 in y orientación Vertical. La hoja ETIQUETA ya trae la "
+        "etiqueta girada como en Label Matrix y se imprime vertical, márgenes 0, ajustada "
+        "a 1 página.",
         "4. Con 35.5 pt cada barra delgada mide 3 puntos de la Zebra (0.015 in). No uses "
         "menos de 24 pt; un P/N muy largo se reduce solo para caber.",
         "5. Code 128 solo acepta letras sin acento, números y símbolos ASCII (sin Ñ). "
