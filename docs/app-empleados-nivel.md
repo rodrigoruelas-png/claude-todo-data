@@ -142,14 +142,21 @@ activo** en ENTRENAMIENTOS.
 | ¿Quién cambió qué? | *Modificado por* + historial de versiones |
 | ¿Quién cargó los empleados/listas? | `CargadoPor` (script, usuario de Windows) + registro local `.log` |
 
-## 11. Noetix / Oracle EBS: responsabilidades que sirven
-Del listado que pasaste (no pude abrir el enlace de Noetix: host interno, sin resolución desde aquí):
-- **Para extraer datos (solo lectura): `EMR NOETIX Global, Standard`** (vistas de Noetix) y
-  `EMR INV View Only ASCO US FMC` (existencias). Las vistas exactas las tienes que ver en Noetix.
-- Para MC1: `EMR INV User ASCO MC1 US FMC` solo si ya lo usas para consultar; **evitar para
-  automatizar** responsabilidades que pueden transaccionar (`INV User`, `WIP Shopfloor`, `WIP Supervisor`).
-- WIP / WIPREG: `EMR WIP Supervisor ASCO MC1` y `EMR WIP Shopfloor ASCO MC1` son de operación; para
-  consultar jobs y requerimientos usar las vistas de WIP en Noetix con la responsabilidad de solo lectura.
-- `BOM`/`CST`/`PO`/`ONT` View Only/Inquiry: útiles solo si después cruzamos listas de materiales,
-  costos, órdenes de compra o pedidos.
-Regla: la automatización usa una cuenta de solo lectura y corre en el ambiente de DESARROLLO/prueba.
+## 11. Noetix / Oracle EBS: qué responsabilidad usar (según tu menú de Navigator)
+No pude abrir Oracle ni Noetix (host interno; tu Edge no está conectado a esta sesión). Esto sale solo
+del menú que pegaste; lo que hace cada pantalla hay que confirmarlo abriéndola tú.
+
+| Responsabilidad | Qué muestra el menú | Uso propuesto |
+|---|---|---|
+| **EMR NOETIX Global, Standard** | Solo "NOETIX Reporting" | **Extracción automática/consultas** (vistas de Noetix). Primera opción. |
+| **EMR INV View Only ASCO US FMC** | Transacciones, On-hand/Availability, Items, Costos, Planeación (solo consulta) + Cambiar organización | Existencias por P/N; cambiar a MC1 con *Change Organization*. Segura. |
+| **EMR ONT Order Inquiry TES** | View Onhand, On Hand Quantity, View Discrete Jobs, View Material Requirements, View Material Transactions, Item Supply/Demand | Cruce de **requerimientos de WIP vs existencia** (ítems críticos) y último movimiento. Todo "View". |
+| EMR CST View Only ASCO US FMC | Discrete Jobs, View Transactions, Item Costs | Costos/valor de inventario sin movimiento (si lo piden). |
+| EMR PO / BOM View Only | Compras, listas de materiales | Solo si luego se cruzan compras o BOM. |
+| EMR WIP Shopfloor / Supervisor ASCO MC1 | Job/Schedule Details, Material Transactions, **Move Transactions**, "Run All WIP Reports" | Consulta de jobs; contiene transacciones: **no usar para automatizar**. Ahí puede estar el reporte de WIP (confirmar si WIPREG sale de ahí). |
+| **EVITAR para automatizar** (pueden registrar transacciones) | EMR INV User ASCO MC1 / AKN (Transactions, Move Orders, Counting, Kanban); EMR INV Stockroom User TES (Subinventory Transfer, Miscellaneous Transaction, Cycle Counts, Move Orders) | Solo operación manual. Un error aquí mueve inventario real. |
+
+Orden sugerido para probar (en DESARROLLO/prueba): 1) Noetix Reporting → localizar las vistas de existencias,
+transacciones y requerimientos WIP; 2) validar un P/N contra *View Onhand* de ONT Order Inquiry TES;
+3) comparar el total contra `MC1 ONHAND Aging Report` del mismo corte. Las consultas de
+`docs/propuestas/consultas_ebs_solo_lectura.sql` se adaptan a las vistas de Noetix cuando las tengas.
