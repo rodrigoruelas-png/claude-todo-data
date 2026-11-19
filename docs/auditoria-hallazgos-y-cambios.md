@@ -61,3 +61,41 @@ La gráfica es un diseño: no hay datos reales cargados, no se hizo ninguna cifr
 ## 3. Decisiones que necesito de ti al regresar
 Marca qué se implementa: H1–H12 (individual) · definiciones de §2.1 · si el inventario va en
 Power BI o Power Apps · cuál es el sitio de DESARROLLO para pruebas y quién da acceso de solo lectura a EBS.
+
+## 4. Extracción Noetix de ejemplo (`Noetix_Tescom_Automatico_v4`) — lo que se pudo verificar
+Revisé los dos Excel (v4 completo y v4 parte 2). **No** los guardé en el repo (pesan 7–17 MB, traen
+datos de inventario y las celdas LOGIN contienen usuario/contraseña de Noetix: cámbiala y bórrala del archivo).
+Script de análisis (solo lectura, no abre LOGIN): `scripts/noetix_analisis.py`.
+
+**Cómo funciona el Excel:** consultas web al gateway de Noetix; usuario, contraseña y responsabilidad se
+leen de la hoja LOGIN; los parámetros están en PARAMETROS (organización `ASCO_USA_IO_MC1`, rango de fechas,
+bloques de 12 P/N para notas de ingeniería). "Datos > Actualizar todo" vuelve a consultar.
+
+| Hoja | Vista de Noetix | Para qué sirve | Datos |
+|---|---|---|---|
+| OnHand | `INVG0_Onhand_Quantities` | Existencias MC1 por P/N, subinventario, locator, planner | ~29.9 mil filas, ~19 mil P/N |
+| Dispatch_WO | `WIPG0_Routings` | Estatus de WO por operación (cola, en proceso, por mover) | ~49 mil filas, ~9.3 mil jobs |
+| WIP_Completions | `INVG0_Transactions` | Terminaciones de ensamble por fecha, con cantidad y usuario | ~125 mil filas (ene–sep 2026) |
+| WO_SO | `WIPG0_Sales_Orders` | WO ligadas a pedidos de venta (fechas prometidas) | ~3.8 mil filas |
+| Calidad_Proveedor | `XXQA_RESULTS_V` | Calidad de recibo por proveedor | 762 filas |
+| Notas_01…20 | `INVG0_Item_Notes` | Notas de ingeniería por P/N | por bloques |
+
+**Hallazgos sobre el ejemplo**
+1. **El rango pedido llega al 17-nov-2026, pero la última terminación WIP que trae es del 10-sep-2026**:
+   la actualización pudo quedar incompleta o desfasada. Revisar antes de usar los resultados.
+2. **OnHand no trae fecha de recepción**, así que **no se puede calcular antigüedad** (el `MC1 ONHAND Aging
+   Report`). Hay que agregar una consulta de Noetix con fecha de recepción, o usar ese Excel.
+3. **"Sin movimiento" no se puede dar completo con este ejemplo:** WIP_Completions solo trae terminaciones
+   de ensamble; no incluye consumo de componentes ni transferencias. Como primera aproximación, solo para
+   ítems fabricados (MAKE ITEM, FINISHED GOOD, MTO, CONFIGURED, KIT): con 180 días sin terminación salen
+   **~3,257 P/N con existencia** (candidatos, no conclusión). Para los comprados hace falta una consulta
+   sobre `INVG0_Transactions` **sin filtrar por tipo**, tomando la última fecha por P/N.
+4. **Ítems críticos:** las existencias por P/N (OnHand) se pueden cruzar con los jobs abiertos de
+   Dispatch_WO, pero ese reporte no trae los **requerimientos de componentes** (qty requerida/entregada).
+   Falta una vista de requerimientos WIP en Noetix.
+5. **Usuario de la transacción** (`A$Created_By`): podría alimentar EFECTIVIDAD por empleado, pero
+   mide quién registró, no necesariamente quién ensambló; no usarlo para evaluar personas sin validarlo con Gaddiel.
+6. Mantener `Dias hacia atras` pequeño en pruebas (30 días) y el ejemplo completo solo cuando haga falta: el v4 completo pesa 17 MB.
+
+**Para automatizar la conciliación con WIPREG / Aging** falta: (a) las columnas de WIPREG que manda Yahir,
+(b) la vista de Noetix con fecha de recepción, (c) la vista de requerimientos WIP.
