@@ -8,6 +8,9 @@ Si ya existen listas en la app generada (EMPLEADOS, POSICIONES…), el script so
 ## 1. Listas
 EMPLEADOS · COMPETENCIAS (pasos de entrenamiento por área y nivel) · ENTRENAMIENTOS (evidencia
 y firmas) · EFECTIVIDAD (resultados medibles por periodo) · POSICIONES (14) · FIRMANTES.
+ENTRENAMIENTOS lleva `Area` (texto, copiado de COMPETENCIAS), `EstatusAprobacion` (Pendiente / Aprobado / Rechazado,
+escrito solo por el flujo de aprobación), `EvidenciaEmpleado` (lo aporta el propio empleado) y los datos
+de trazabilidad de §10.
 Relación por `NumEmpleado` (texto) para evitar problemas de delegación con búsquedas.
 
 ## 2. Niveles
@@ -27,37 +30,61 @@ regla **A/C Oracle ↔ B RH** con Gaddiel. El script mapea: Operator A→A, C→
 9. **Justificación de ascenso** – resumen imprimible/PDF para Gerencia (Trin).
 
 ## 4. Fórmulas clave
+Reglas: (1) columnas **Elección** siempre con `.Value`; (2) no cargar ENTRENAMIENTOS completa
+(límite de 500 filas por defecto, 2000 máx.): se consulta **por empleado** con filtros delegables.
+Parche adicional: Configuración › General › "Límite de filas de datos" = 2000.
 ```powerfx
-// App.OnStart
-Set(gblYo, LookUp(FIRMANTES, Correo = User().Email));  // rol firmante, si aplica
+// App.OnStart  (solo tablas pequeñas: 13 empleados y el catálogo de competencias)
+Set(gblYo, LookUp(FIRMANTES, Correo = User().Email && Activo = true));
 ClearCollect(colEmp, Filter(EMPLEADOS, Activo = true));
-ClearCollect(colEnt, ENTRENAMIENTOS);
 ClearCollect(colComp, COMPETENCIAS);
 
-// % cumplimiento del empleado ThisItem (pasos aprobados / pasos de su nivel objetivo)
-With({req: CountRows(Filter(colComp, NivelRequerido = Coalesce(ThisItem.NivelPropuesto, ThisItem.NivelActual))),
-      ok:  CountRows(Filter(colEnt, NumEmpleado = ThisItem.NumEmpleado, Resultado = "Aprobado",
-                            !IsBlank(AprobadoPor)))},
-  If(req = 0, 0, Round(ok / req * 100, 0)))
+// % cumplimiento del empleado ThisItem (pasos aprobados por Gaddiel / pasos de su nivel objetivo)
+// ENTRENAMIENTOS se filtra por NumEmpleado y EstatusAprobacion.Value (delegable: ~40 filas por empleado)
+With({nivel: Coalesce(ThisItem.NivelPropuesto.Value, ThisItem.NivelActual.Value)},
+  With({req: CountRows(Filter(colComp, NivelRequerido.Value = nivel)),
+        ok:  CountRows(Filter(ENTRENAMIENTOS, NumEmpleado = ThisItem.NumEmpleado,
+                              EstatusAprobacion.Value = "Aprobado"))},
+    If(req = 0, 0, Round(ok / req * 100, 0))))
 
-// Iniciales cuando no hay FOTO
+// Iniciales cuando no hay FOTO (Title = "Apellido, Nombre")
 Upper(Left(Last(Split(ThisItem.Title, ", ")).Value, 1) & Left(First(Split(ThisItem.Title, ", ")).Value, 1))
 
-// Gráfica de avance por área (Column chart, Items)
-AddColumns(GroupBy(Filter(colEnt, NumEmpleado = gblEmp.NumEmpleado, Resultado = "Aprobado"),
-    "Area", "g"), "Pasos", CountRows(g))
-```
+// Gráfica de avance por área (Column chart, Items). Area es TEXTO en ENTRENAMIENTOS
+AddColumns(
+  GroupBy(Filter(ENTRENAMIENTOS, NumEmpleado = gblEmp.NumEmpleado,
+                 EstatusAprobacion.Value = "Aprobado"), "Area", "g"),
+  "Pasos", CountRows(g))
 
-## 5. Aprobación (solo Gaddiel)
-Un paso cuenta al cumplimiento cuando está `Aprobado` y tiene `AprobadoPor`. Solo Gaddiel
-aprueba; su correo se da de alta en la lista FIRMANTES (rol Supervisor). Si después aprueba
-alguien más (otra persona o tú), se agrega ahí sin tocar la app.
-```powerfx
-// Botón Aprobar (visible solo si gblYo no está vacío)
-Patch(ENTRENAMIENTOS, galPasos.Selected, {
-  AprobadoPor: User().FullName, FechaAprobacion: Now() })
+// Registrar un paso (entrenador o Lead): llena Area al crear
+Patch(ENTRENAMIENTOS, Defaults(ENTRENAMIENTOS), {
+  Title: cmbComp.Selected.Title, NumEmpleado: gblEmp.NumEmpleado,
+  Competencia: cmbComp.Selected.Title, Area: cmbComp.Selected.Area.Value,
+  Resultado: ddResultado.Selected, EstatusAprobacion: {Value: "Pendiente"},
+  Entrenador: User().FullName, FechaInicio: dpInicio.SelectedDate })
+
+// El propio empleado aporta evidencia (queda Pendiente hasta que Gaddiel apruebe)
+Patch(ENTRENAMIENTOS, Defaults(ENTRENAMIENTOS), {
+  Title: cmbComp.Selected.Title, NumEmpleado: gblEmp.NumEmpleado,
+  Competencia: cmbComp.Selected.Title, Area: cmbComp.Selected.Area.Value,
+  Resultado: {Value: "En proceso"}, EstatusAprobacion: {Value: "Pendiente"},
+  EvidenciaEmpleado: txtEvidencia.Text })
 ```
-Es registro interno por cuenta de Microsoft 365; si RH exige firma legal, confirmarlo con ellos.
+Notas de prueba (en DESARROLLO): el icono amarillo de delegación no debe aparecer en esas
+fórmulas; con >500 pasos de prueba el % debe seguir correcto. `gblEmp` es el empleado abierto en Perfil.
+
+## 5. Aprobación (solo Gaddiel) — con flujo de Power Automate
+La app **ya no escribe** la aprobación. Un paso cuenta al cumplimiento solo cuando
+`EstatusAprobacion = Aprobado`, y ese valor solo lo escribe el flujo tras la respuesta de Gaddiel.
+Flujo (propuesto, sin probar; crearlo primero en el ambiente de DESARROLLO):
+1. Disparador: "Cuando se crea o modifica un elemento" en ENTRENAMIENTOS.
+2. Condición: `Resultado = Aprobado` **y** `EstatusAprobacion = Pendiente` (evita ciclos).
+3. "Iniciar y esperar una aprobación" asignada al correo de Gaddiel (lista FIRMANTES, rol Supervisor);
+   el detalle incluye empleado, paso, área y evidencia del empleado.
+4. Si aprueba: actualizar elemento → `EstatusAprobacion=Aprobado`, `AprobadoPor`=nombre del aprobador,
+   `FechaAprobacion`=`utcNow()`. Si rechaza: `Rechazado` + comentario en `Comentarios`.
+5. Es un registro interno con cuenta M365 y fecha reales; si RH exige firma legal, confirmarlo con ellos.
+Con esto un editor de SharePoint ya no "aprueba a mano" sin dejar rastro (ver §10: historial de versiones).
 
 ## 6. Efectividad (lo que Gaddiel pidió: ascensos con resultados)
 Indicadores por empleado y periodo (lista EFECTIVIDAD; se llenan desde Oracle o el Excel
@@ -92,3 +119,37 @@ lo respaldan**; si falta evidencia, la pantalla muestra qué falta.
 - Metas numéricas de eficiencia/retrabajo: las da Gaddiel.
 - Correo de Gaddiel para FIRMANTES.
 - `V:\general data` / `\\na-mex-fps-01`: sin acceso desde esta sesión.
+
+## 10. Permisos reales y trazabilidad (quién entregó y quién fue responsable)
+**Corrección a mi propuesta anterior:** una app de lienzo con el conector de SharePoint usa los
+permisos de **cada usuario**, así que no lee "con cuenta de servicio" por sí sola. Opciones (decide tú/TI):
+- **A. Permisos por elemento con flujo:** al crear un empleado/entrenamiento, un flujo rompe la
+  herencia y deja acceso solo a ese empleado, a Gaddiel y a RH/Ingeniería. Operadores ven solo lo suyo.
+- **B. Los operadores no abren la app:** la usan Lead, Gaddiel e Ingeniería; el operador solo aporta
+  evidencia por un formulario/flujo. Más simple y seguro.
+- **C. Dataverse con seguridad por fila** (requiere licencia Premium).
+Base común: lista EMPLEADOS y ENTRENAMIENTOS sin herencia del sitio; lectura/edición solo para grupos
+definidos (RH/Ingeniería = lectura, Lead = captura, Gaddiel = administra); **historial de versiones
+activo** en ENTRENAMIENTOS.
+
+**Trazabilidad** (todo queda guardado, sin depender de que alguien lo capture):
+| Pregunta | Dónde queda |
+|---|---|
+| ¿Quién entregó/capturó el registro? | Columna del sistema *Creado por* (+ `CapturadoPor` con `User().FullName` desde la app) |
+| ¿Quién fue el responsable del entrenamiento? | `Entrenador` |
+| ¿Qué aportó el empleado? | `EvidenciaEmpleado` + archivos adjuntos |
+| ¿Quién aprobó y cuándo? | `AprobadoPor` + `FechaAprobacion` (escritos por el flujo) |
+| ¿Quién cambió qué? | *Modificado por* + historial de versiones |
+| ¿Quién cargó los empleados/listas? | `CargadoPor` (script, usuario de Windows) + registro local `.log` |
+
+## 11. Noetix / Oracle EBS: responsabilidades que sirven
+Del listado que pasaste (no pude abrir el enlace de Noetix: host interno, sin resolución desde aquí):
+- **Para extraer datos (solo lectura): `EMR NOETIX Global, Standard`** (vistas de Noetix) y
+  `EMR INV View Only ASCO US FMC` (existencias). Las vistas exactas las tienes que ver en Noetix.
+- Para MC1: `EMR INV User ASCO MC1 US FMC` solo si ya lo usas para consultar; **evitar para
+  automatizar** responsabilidades que pueden transaccionar (`INV User`, `WIP Shopfloor`, `WIP Supervisor`).
+- WIP / WIPREG: `EMR WIP Supervisor ASCO MC1` y `EMR WIP Shopfloor ASCO MC1` son de operación; para
+  consultar jobs y requerimientos usar las vistas de WIP en Noetix con la responsabilidad de solo lectura.
+- `BOM`/`CST`/`PO`/`ONT` View Only/Inquiry: útiles solo si después cruzamos listas de materiales,
+  costos, órdenes de compra o pedidos.
+Regla: la automatización usa una cuenta de solo lectura y corre en el ambiente de DESARROLLO/prueba.
